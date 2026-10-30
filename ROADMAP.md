@@ -108,12 +108,15 @@ NEVER lead with accuracy — the fraud class is what matters.
 14. References slide
 15. Q&A prep
 
-### Group contribution plan (everyone must be able to defend their part)
-- Member A: data ingestion + preprocessing
-- Member B: modeling + tuning
-- Member C: evaluation + dashboard
-- Member D: architecture, Docker, (streaming), report writing
-→ Each member builds one notebook section themselves.
+### Group contribution plan — 2-member team (both must be able to defend the project)
+| | Member 1 (you) — technical lead | Member 2 |
+|---|---|---|
+| Pipeline work | Docker env, PySpark EDA/preprocessing, modeling, evaluation, dashboard | — |
+| Supporting work | — | Literature review: 2024–2026 papers (IJCAI, AAAI, CIKM, Kafka/Spark 2025) → related-work slide + `reports/references.bib` |
+| Report & slides | Implementation, architecture, results sections | Proposal, intro, conclusion; slide design & layout |
+| Presentation | Walks through implementation live (Docker → Spark → results) | Problem statement, why-big-data, related work, conclusions |
+
+⚠️ **Instruction #8 trap:** since Member 1 is doing the core build, Member 2 must actively engage with it too (e.g., run the check notebook once + do a teach-back session ~1 week before the presentation) so both can answer questions under viva.
 
 ### Conclusion section checklist
 - Key findings (e.g., GBT beats LR; PR-AUC = 0.XX)
