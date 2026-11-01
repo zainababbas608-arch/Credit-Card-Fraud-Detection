@@ -1,0 +1,20 @@
+{
+  "name": "Fraud Detection - PySpark",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": "."
+  },
+  "containerName": "fraud-datascience",
+  "workspaceFolder": "/home/jovyan/work",
+  "remoteUser": "jovyan",
+  "mounts": [
+    "source=${localWorkspaceFolder},target=/home/jovyan/work,type=bind"
+  ],
+  "workspaceMount": "",
+  "forwardPorts": [8888, 4040, 8501],
+  "customizations": {
+    "vscode": {
+      "extensions": ["ms-python.python", "ms-toolsai.jupyter"]
+    }
+  }
+}
