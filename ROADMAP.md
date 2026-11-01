@@ -2,7 +2,7 @@
 
 **Course:** Big Data Analytics (Final Year)
 **Team:** 2 members (Member 1 = technical lead; Member 2 = literature, report, slides)
-**Dataset:** IEEE-CIS Fraud Detection (Kaggle/Vesta) · ~690k train transactions, 400+ features
+**Dataset:** IEEE-CIS Fraud Detection (Kaggle/Vesta) · 590,540 train transactions (measured), 394 features
 **Tech Stack:** Python · PySpark (MLlib + Structured Streaming) · Docker + VS Code Dev Containers · Parquet · Kafka (stretch) · Streamlit · Jupyter
 **Scope decision:** Batch pipeline is the core deliverable; real-time streaming is a stretch goal only if time allows.
 
