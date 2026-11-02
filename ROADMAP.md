@@ -94,12 +94,17 @@ Deliverables must follow the course instructions: presentation of 10–15 slides
 
 # 🧩 PHASE 5 — Extensions & Demo Assets (priority order, only if time allows)
 
-1. [ ] **Streamlit dashboard** (effectively must-have for demo):
+1. [ ] **Streamlit dashboard — DEFINITE** (effectively must-have for demo):
      - Fraud stats, feature importances, single-transaction "predict this" form
-2. [ ] **Streaming** pipeline (Kafka + Spark Structured Streaming):
+     - Runs inside the existing container on reserved port 8501
+2. [ ] **Dash/Plotly dashboard — OPTIONAL, priority-gated** (only after Streamlit + core phases are safely done):
+     - "Prototype → analyst console" upgrade story: callbacks, multi-page (`pages/`), editable alert table via `dash-table`
+     - Reuses the same Parquet + model artifacts — v1 Streamlit remains the shipped version regardless
+     - Report line: React/FastAPI parked as "production-grade future work"; Dash only if time allows (app-like interactivity, near-zero deployment risk)
+3. [ ] **Streaming** pipeline (Kafka + Spark Structured Streaming):
      - Kafka producer replays test transactions → streaming job scores them → alert output
      - Backed by the 2025 Kafka/Spark/PySpark MLlib paper — strong citation + demo value
-3. [ ] Dockerize full pipeline into clean, re-runnable services
+4. [ ] Dockerize full pipeline into clean, re-runnable services
 
 # 🧩 PHASE 6 — Deliverables & Presentation (aligned to course instructions 1–8)
 
