@@ -31,6 +31,7 @@ metastore_db/
 .env
 .DS_Store
 Thumbs.db
+docker_run_steps
 
 # ---- Reports (keep, but ignore temp exports) ----
 reports/~$*
