@@ -18,11 +18,11 @@ Deliverables must follow the course instructions: presentation of 10–15 slides
 ## 📊 Overall Progress
 | Phase | Name | Status |
 |---|---|---|
-| 1 | Foundation: Environment & Data | ✅ mostly done (dev files built; validation notebook pending) |
-| 2 | Data Pipeline: EDA & Preprocessing | ⬜ start next |
-| 3 | Modeling | ⬜ |
-| 4 | Evaluation | ⬜ |
-| 5 | Extensions & Demo Assets | ⬜ (stretch goals) |
+| 1 | Foundation: Environment & Data | ✅ done (container `fraud-datascience`, replay-verified notebooks 00–01) |
+| 2 | Data Pipeline: EDA & Preprocessing | ✅ done (notebooks 02–04 replay-verified; screenshots 01–14) |
+| 3 | Modeling | ✅ done (notebook 05 + imbalance shootout; screenshots 15–23) |
+| 4 | Evaluation | ✅ done (notebook 06 full-scale + RF sweep + curves; screenshots 24–32) |
+| 5 | Extensions & Demo Assets | ⬜ next — dashboard plan drafted, decision pending (model selector) |
 | 6 | Deliverables & Presentation | ⬜ |
 
 ---
@@ -44,8 +44,8 @@ Deliverables must follow the course instructions: presentation of 10–15 slides
 - [x] Download IEEE-CIS dataset from Kaggle → `data/` (all 5 CSVs present)
 - [x] Docker Desktop fixed, storage moved to D:, engine verified running
 - [x] `.devcontainer/` (Dockerfile, spark-defaults.conf, devcontainer.json) + root `docker-compose.yml`
-- [ ] First image build: `docker pull jupyter/pyspark-notebook:latest` → **Reopen in Container**, green badge + `pyspark --version` check
-- [ ] Validation notebook `notebooks/00_environment_check.ipynb`: SparkSession → read `train_transaction.csv` → row count, schema, `isFraud` distribution → screenshots to `reports/screenshots/`
+- [x] First image build: devcontainer image built; container renamed `fraud-datascience`; `pyspark 3.5.0` verified inside (green-badge recovery procedure documented and drilled)
+- [x] Validation notebook `notebooks/00_environment_check.ipynb`: SparkSession → schema/count verification (+ `01_csv_to_parquet.ipynb`) → screenshots `01`–`03` in `reports/screenshots/`
 - [x] Git repo initialized + pushed; folder skeleton with `.gitkeep`
 - [ ] Populate `reports/references.bib` — target 6–8 references, prioritizing 2024–2026 (**Member 2**):
   - *Effective High-order Graph Representation Learning for Credit Card Fraud Detection* (IJCAI 2024)
@@ -57,46 +57,57 @@ Deliverables must follow the course instructions: presentation of 10–15 slides
 
 # 🧩 PHASE 2 — Data Pipeline: EDA & Preprocessing (PySpark)
 
-- [ ] Convert CSV → **Parquet** (columnar, compressed; partitioned by date)
-- [ ] EDA with Spark DataFrames (NOT pandas):
-  - Fraud rate (~3.5%), transaction amount distributions, time-of-day patterns
-  - Missing-value map, correlation sampling of the 400+ V-features
-- [ ] Preprocessing decisions:
-  - Drop columns with >80% missing values
-  - Remove near-duplicate V-columns via correlation (Spark aggregation exercise)
-- [ ] Join transaction + identity tables on `TransactionID`
-- [ ] Feature engineering (explainable in viva — key marks area):
-  - `TransactionDT` → hour-of-day / day-of-week
-  - Amount bins
-  - Card velocity features ("txn count in last 1h per card") via **Spark window functions**
-- [ ] Save cleaned feature set to Parquet
-- [ ] EDA output plots/screenshots → `reports/screenshots/`
+- [x] Convert CSV → **Parquet** (columnar, compressed; verified lossless on all 4 files)
+- [x] EDA with Spark DataFrames (NOT pandas):
+  - Fraud rate **3.50%** (20,663 / 590,540), amount-band and time-of-day patterns
+  - **14.47% fraud at $0–1** (card-testing signature)
+  - Missing-value census: **55 columns >80% empty** (none >95%)
+- [x] Preprocessing decisions:
+  - Dropped 55 columns with >80% missing values
+  - Removed **49** near-duplicate V-columns via |r|>0.98 (5% sample + np.corrcoef hybrid)
+- [ ] Join transaction + identity tables on `TransactionID` — **DESCOPED** (transaction columns carried the signal; identity join = future work)
+- [x] Feature engineering (explainable in viva — key marks area):
+  - `TransactionDT` → `day` / `hour` / `wd` (relative time only)
+  - **Velocity features** via Spark window functions: `card1_txn_24h`, `card1_amt_24h`, `card1_txn_all`, `card1_amt_avg`, `amt_vs_card` (trailing 24h windows = leakage-proof)
+  - Density proof: 78.4% of rows have >1 txn in trailing 24h; max card = 881 txn/24h
+- [x] Save cleaned feature set to Parquet (`train_features`, 590,540 × 298)
+- [x] EDA output plots/screenshots → `reports/screenshots/` (`04`–`14`)
 
 # 🧩 PHASE 3 — Modeling (Spark MLlib)
 
-- [ ] **Time-based split** (train on past, test on latest) — never a random split for fraud
-- [ ] Pipeline: `VectorAssembler → StandardScaler → model`
-- [ ] Models in increasing sophistication:
-  1. Logistic Regression (baseline, class weights for imbalance)
-  2. Random Forest
-  3. Gradient-Boosted Trees (likely winner)
-- [ ] Hyperparameter tuning with `CrossValidator` / `TrainValidationSplit` (on 5–10% samples — laptop RAM rule)
+- [x] **Time-based split** (train days 0–165 / test 166–182, fraud 3.47% vs 3.88%) — never a random split for fraud
+- [x] Pipeline: median-impute (train-only) → StringIndexer frequency-encoding (metadata stripped) → `VectorAssembler` (StandardScaler descoped — trees don't need it; frequency encoding chosen instead)
+- [x] Models in increasing sophistication:
+  1. Logistic Regression (baseline; weighted; floor)
+  2. Random Forest (60 trees, depth 8)
+  3. Gradient-Boosted Trees (d5 and d3 variants — dfull)
+- [x] Hyperparameter tuning: **weight-scheme shootout** (28x balanced vs sqrt ~5x vs none) + GBT overfit configs (depth/step/subsampling) on the 5% sample — replaced CrossValidator as the laptop-friendly tuning story
+- [x] `05_model_training.ipynb` replay-verified end-to-end (Restart & Run All clean)
 
 # 🧩 PHASE 4 — Evaluation
 
 ⚠️ NEVER lead with accuracy — the fraud class is what matters.
-- [ ] Metrics: **PR-AUC, ROC-AUC, precision, recall, F1** (fraud class) + confusion matrix
-- [ ] Threshold tuning with business justification (e.g., target recall ≥ 0.80)
-- [ ] Model comparison table — becomes the results section of report + slide 10
-- [ ] Train final selected model on the FULL dataset (tuning was sampled)
-- [ ] Take **Spark UI screenshots** (stages, executors, DAG) as proof of distributed execution
-- [ ] For every result, write a 1–2 sentence *how it works* explanation (course instruction #5)
+- [x] Metrics: **PR-AUC, ROC-AUC, precision, recall, F1** (fraud class) + confusion counts (scorer applied identically to every model)
+- [x] Threshold tuning with business justification: 19-point sweep on both champions; F1-optimal operating points (GBT-d5 @0.5, RF @0.4) + the precision-vs-recall trade card
+- [x] Model comparison table (`29_full_comparison.png`) — becomes the results section of report + slide 10
+- [x] Train final models on the FULL 543,948-row train split (tuning was on the 5% sample)
+- [ ] Additional Phase-4 Spark UI screenshots (optional; distributed-execution proof already in `05`, `13` from Phase 2)
+- [x] For every result, a 1–2 sentence *how it works* explanation (cells carry the narrative; this roadmap + chat carry the full one)
+
+### Phase 4 measured results (2026-11-05)
+- Full-scale comparison (test split): LR prAUC 0.177 / **RF 0.4863** / **GBT-d5 0.4860 (rocAUC 0.8874)** / GBT-d3 0.4531 — vs random baseline prAUC 0.039 (~12.5x lift)
+- Operating points: **GBT-d5 @0.5 → precision 0.525, recall 0.469, F1 0.495, 1,618 alerts**; **RF @0.4 → precision 0.596, recall 0.430, F1 0.499, 1,303 alerts**
+- RF and GBT-d5 = co-champions (statistical tie on ranking; calibration personalities differ — RF high-precision at high thresholds, e.g. 0.948 precision @0.9)
+- Full-scale training collapsed the sample-era overfit gap: GBT-d5 train-test prAUC gap 0.27 → 0.078
+- Top features of winner: V258, C13, C1, TransactionAmt, **card1_amt_avg (engineered velocity, 4.0%)**, C14, C11, day, card6, card3
+- Artifacts: `models/gbt_winner`, `reports/figures/pr_roc_curves.png`, screenshots `24`–`32`
 
 # 🧩 PHASE 5 — Extensions & Demo Assets (priority order, only if time allows)
 
 1. [ ] **Streamlit dashboard — DEFINITE** (effectively must-have for demo):
-     - Fraud stats, feature importances, single-transaction "predict this" form
-     - Runs inside the existing container on reserved port 8501
+     - Decision table (test transactions + scores + ALERT/PASS verdicts), score histogram with threshold dial, live threshold slider (precision/recall/F1/alert count recomputed), confusion tiles
+     - Metrics header (prAUC/rocAUC vs random baseline), top-10 feature importances, EDA context strip (phase-2 findings)
+     - Runs inside the container on reserved port 8501; data from precomputed prediction artifacts (plan drafted 2026-11-05 — **decision pending: model selector for both champions vs GBT-d5 only**)
 2. [ ] **Dash/Plotly dashboard — OPTIONAL, priority-gated** (only after Streamlit + core phases are safely done):
      - "Prototype → analyst console" upgrade story: callbacks, multi-page (`pages/`), editable alert table via `dash-table`
      - Reuses the same Parquet + model artifacts — v1 Streamlit remains the shipped version regardless
@@ -136,7 +147,7 @@ Deliverables must follow the course instructions: presentation of 10–15 slides
 ⚠️ **Instruction #8 trap:** since Member 1 is doing the core build, Member 2 must actively engage with it too (e.g., run the check notebook once + do a teach-back session ~1 week before the presentation) so both can answer questions under viva.
 
 ### Conclusion section checklist
-- Key findings (e.g., GBT beats LR; PR-AUC = 0.XX)
+- Key findings (RF & GBT-d5 tie on ranking prAUC ≈ 0.486 = ~12.5x lift; LR floors at 0.177; engineered velocity features rank in the winner's top-10)
 - Limitations (single-laptop scale, anonymous/V-features, no true cluster)
 - Future improvements (streaming at scale, graph-based detection per IJCAI/AAAI 2024, deep learning, model drift monitoring)
 
