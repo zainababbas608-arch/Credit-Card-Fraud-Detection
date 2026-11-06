@@ -35,3 +35,6 @@ docker_run_steps
 
 # ---- Reports (keep, but ignore temp exports) ----
 reports/~$*
+
+# ---- Models (keep, but ignore temp exports) ----
+models/
