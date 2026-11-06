@@ -102,20 +102,43 @@ Deliverables must follow the course instructions: presentation of 10–15 slides
 - Top features of winner: V258, C13, C1, TransactionAmt, **card1_amt_avg (engineered velocity, 4.0%)**, C14, C11, day, card6, card3
 - Artifacts: `models/gbt_winner`, `reports/figures/pr_roc_curves.png`, screenshots `24`–`32`
 
-# 🧩 PHASE 5 — Extensions & Demo Assets (priority order, only if time allows)
+# 🧩 PHASE 5 — Extensions & Demo Assets (streaming checkpoint 2026-11-06)
 
-1. [ ] **Streamlit dashboard — DEFINITE** (effectively must-have for demo):
-     - Decision table (test transactions + scores + ALERT/PASS verdicts), score histogram with threshold dial, live threshold slider (precision/recall/F1/alert count recomputed), confusion tiles
-     - Metrics header (prAUC/rocAUC vs random baseline), top-10 feature importances, EDA context strip (phase-2 findings)
-     - Runs inside the container on reserved port 8501; data from precomputed prediction artifacts (plan drafted 2026-11-05 — **decision pending: model selector for both champions vs GBT-d5 only**)
-2. [ ] **Dash/Plotly dashboard — OPTIONAL, priority-gated** (only after Streamlit + core phases are safely done):
-     - "Prototype → analyst console" upgrade story: callbacks, multi-page (`pages/`), editable alert table via `dash-table`
-     - Reuses the same Parquet + model artifacts — v1 Streamlit remains the shipped version regardless
-     - Report line: React/FastAPI parked as "production-grade future work"; Dash only if time allows (app-like interactivity, near-zero deployment risk)
-3. [ ] **Streaming** pipeline (Kafka + Spark Structured Streaming):
-     - Kafka producer replays test transactions → streaming job scores them → alert output
-     - Backed by the 2025 Kafka/Spark/PySpark MLlib paper — strong citation + demo value
-4. [ ] Dockerize full pipeline into clean, re-runnable services
+1. [x] **Streamlit "Fraud Watch" officer console — SHIPPED** (`src/dashboard/app.py`, ~215 lines):
+     - Officer-facing shift screen: one case card at a time (charge, suspicion %
+       with red/amber/green badge, plain-language reasons from real percentiles of the
+       scored data), Confirm fraud / False alarm buttons, notifications ticker, and an
+       investigation log that scores officer decisions against truth labels
+     - Single-model authority locked: GBT-d5 @0.5 (RF stays a Statistics-tab footnote)
+     - Statistics tab holds the science: alarm-strictness dial, 19-row sweep
+       (recomputed live), score histograms, top-10 importances (engineered
+       `card1_amt_avg` highlighted), transaction lookup, Phase-2 EDA facts
+     - Replay engine: reads precomputed artifact `data/processed/dashboard_test.csv`
+       (46,592 scored rows, 18 cols, written by notebook 06 Cell 17) — no Spark in the
+       UI; shift pre-primes on the first alert (row 50, day 166) and auto-plays;
+       full 17-day window replays in ~26 s at default speed 3 (cases appear instantly
+       from load — pacing rebuilt after v1 feedback)
+2. [x] **Environment incident + fix (2026-11-04/05)**: pip-installing Streamlit into the
+     shared conda env upgraded numpy to 2.4.6 and broke every NumPy-1.x-compiled
+     library (pandas/pyarrow/scipy/sklearn ABI failure). Fix: Streamlit isolated in
+     dedicated venv `/opt/venv/fraudui` (Dockerfile layer); notebooks rule stays
+     `/opt/conda`, dashboard rule `/opt/venv/fraudui` — one environment per artifact.
+3. [x] **Evidence**: `33` Cell-17 artifact checkpoint · `34` shift end (46,592 seen |
+     1,618 suspicious | 4 decisions | ~52% alarm accuracy) · `35` Statistics tab at the
+     locked operating point (0.495 F1 @ 0.5, matching Phase 4 to the digit)
+     - Record correction confirmed from two sources: test window holds **1,809 real
+       frauds** (849 caught + 960 missed), not 1,781 as quoted in early chat notes
+4. [ ] **Streaming (NEXT — architecture agreed 2026-11-06)**: Kafka broker (docker-compose
+     service, KRaft single node) + producer replaying IEEE-CIS test transactions at
+     N rows/s → `transactions` topic → Spark Structured Streaming job (`notebook 07`)
+     applies saved `models/gbt_winner` → `alerts` topic + parquet + checkpoints;
+     measured end-to-end latency + restart-resume demo. Fact that scopes it honestly:
+     no public live labeled card feed exists (PII/PCI); broker + benchmark corpus is
+     the standard fraud-stream evaluation setup — report/slide will state this.
+     Fallback if broker is painful: socket source (same model path, fewer semantics).
+     Adder: dashboard flips from CSV replay to live monitor of the alerts stream.
+5. [ ] Dockerize full pipeline into clean, re-runnable services (venv layer already in
+     place; remaining: one-command bring-up of all services)
 
 # 🧩 PHASE 6 — Deliverables & Presentation (aligned to course instructions 1–8)
 
