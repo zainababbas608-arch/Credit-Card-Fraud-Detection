@@ -1,7 +1,6 @@
 # 🗺️ Project Roadmap — Credit Card Fraud Detection using Big Data
 
 **Course:** Big Data Analytics (Final Year)
-**Team:** 2 members (Member 1 = technical lead; Member 2 = literature, report, slides)
 **Dataset:** IEEE-CIS Fraud Detection (Kaggle/Vesta) · 590,540 train transactions (measured), 394 features
 **Tech Stack:** Python · PySpark (MLlib + Structured Streaming) · Docker + VS Code Dev Containers · Parquet · Kafka (stretch) · Streamlit · Jupyter
 **Scope decision:** Batch pipeline is the core deliverable; real-time streaming is a stretch goal only if time allows.
@@ -11,7 +10,7 @@
 ## 🎯 Goal
 Build a distributed (Spark-based), end-to-end credit card fraud detection pipeline:
 ingest → store → preprocess → train → evaluate → visualize, plus a stretch goal of live streaming detection.
-Deliverables must follow the course instructions: presentation of 10–15 slides, ≥5 recent references (2024–2026), code + screenshots + results with explanations, conclusions on findings/limitations/future work, and every group member able to explain their part.
+Deliverables must follow the course instructions: presentation of 10–15 slides, ≥5 recent references (2024–2026), code + screenshots + results with explanations, conclusions on findings/limitations/future work.
 
 ---
 
@@ -22,8 +21,9 @@ Deliverables must follow the course instructions: presentation of 10–15 slides
 | 2 | Data Pipeline: EDA & Preprocessing | ✅ done (notebooks 02–04 replay-verified; screenshots 01–14) |
 | 3 | Modeling | ✅ done (notebook 05 + imbalance shootout; screenshots 15–23) |
 | 4 | Evaluation | ✅ done (notebook 06 full-scale + RF sweep + curves; screenshots 24–32) |
-| 5 | Extensions & Demo Assets | ⬜ next — dashboard plan drafted, decision pending (model selector) |
-| 6 | Deliverables & Presentation | ⬜ |
+| 5 | Extensions & Demo Assets | ✅ done (Streamlit officer console + scored artifact; streaming moved to Phase 6) |
+| 6 | Streaming: Kafka + Spark Structured Streaming | ⬜ next (architecture agreed 2026-11-06) |
+| 7 | Deliverables & Presentation | ⬜ (final phase) |
 
 ---
 
@@ -40,14 +40,14 @@ Deliverables must follow the course instructions: presentation of 10–15 slides
 
 # 🧩 PHASE 1 — Foundation: Environment & Data
 
-- [x] 1-page project proposal: objective, architecture sketch, stack, evaluation plan *(async during phases — Member 2 owns, feeds slides 2–6)*
+- [x] 1-page project proposal: objective, architecture sketch, stack, evaluation plan (async during phases)
 - [x] Download IEEE-CIS dataset from Kaggle → `data/` (all 5 CSVs present)
 - [x] Docker Desktop fixed, storage moved to D:, engine verified running
 - [x] `.devcontainer/` (Dockerfile, spark-defaults.conf, devcontainer.json) + root `docker-compose.yml`
 - [x] First image build: devcontainer image built; container renamed `fraud-datascience`; `pyspark 3.5.0` verified inside (green-badge recovery procedure documented and drilled)
 - [x] Validation notebook `notebooks/00_environment_check.ipynb`: SparkSession → schema/count verification (+ `01_csv_to_parquet.ipynb`) → screenshots `01`–`03` in `reports/screenshots/`
 - [x] Git repo initialized + pushed; folder skeleton with `.gitkeep`
-- [ ] Populate `reports/references.bib` — target 6–8 references, prioritizing 2024–2026 (**Member 2**):
+- [ ] Populate `reports/references.bib` — target 6–8 references, prioritizing 2024–2026:
   - *Effective High-order Graph Representation Learning for Credit Card Fraud Detection* (IJCAI 2024)
   - *Barely Supervised Learning for Graph-Based Fraud Detection* (AAAI 2024)
   - *A Payment Transaction Pre-training Model for Fraud Transaction Detection* (CIKM 2024)
@@ -102,45 +102,61 @@ Deliverables must follow the course instructions: presentation of 10–15 slides
 - Top features of winner: V258, C13, C1, TransactionAmt, **card1_amt_avg (engineered velocity, 4.0%)**, C14, C11, day, card6, card3
 - Artifacts: `models/gbt_winner`, `reports/figures/pr_roc_curves.png`, screenshots `24`–`32`
 
-# 🧩 PHASE 5 — Extensions & Demo Assets (streaming checkpoint 2026-11-06)
+# 🧩 PHASE 5 — Extensions & Demo Assets (shipped 2026-11-06)
 
-1. [x] **Streamlit "Fraud Watch" officer console — SHIPPED** (`src/dashboard/app.py`, ~215 lines):
-     - Officer-facing shift screen: one case card at a time (charge, suspicion %
-       with red/amber/green badge, plain-language reasons from real percentiles of the
-       scored data), Confirm fraud / False alarm buttons, notifications ticker, and an
-       investigation log that scores officer decisions against truth labels
-     - Single-model authority locked: GBT-d5 @0.5 (RF stays a Statistics-tab footnote)
-     - Statistics tab holds the science: alarm-strictness dial, 19-row sweep
-       (recomputed live), score histograms, top-10 importances (engineered
-       `card1_amt_avg` highlighted), transaction lookup, Phase-2 EDA facts
-     - Replay engine: reads precomputed artifact `data/processed/dashboard_test.csv`
-       (46,592 scored rows, 18 cols, written by notebook 06 Cell 17) — no Spark in the
-       UI; shift pre-primes on the first alert (row 50, day 166) and auto-plays;
-       full 17-day window replays in ~26 s at default speed 3 (cases appear instantly
-       from load — pacing rebuilt after v1 feedback)
-2. [x] **Environment incident + fix (2026-11-04/05)**: pip-installing Streamlit into the
+1. [x] **Streamlit "Fraud Watch" officer console — SHIPPED** (`src/dashboard/app.py`):
+   - Officer-facing shift screen: one case card at a time (charge, suspicion % with
+     red/amber/green risk badge, plain-language reasons computed from real percentiles
+     of the scored data), Confirm fraud / False alarm buttons, notifications ticker,
+     and an investigation log that scores officer decisions against truth labels
+   - Single-model authority locked: GBT-d5 @ threshold 0.5 (RF stays a Statistics-tab
+     footnote, per the Phase-4 decision)
+   - Statistics tab holds the science: alarm-strictness dial, 19-row sweep recomputed
+     live, score histograms, top-10 importances (engineered `card1_amt_avg`
+     highlighted), transaction lookup, Phase-2 EDA facts
+   - Replay engine: reads precomputed artifact `data/processed/dashboard_test.csv`
+     (46,592 scored rows, 18 cols, written by notebook 06 Cell 17) — no Spark in the
+     UI. Shift pre-primes on the first alert (row 50, day 166) and auto-plays; the
+     full 17-day window replays in ~26 s at default speed 3 — cases appear instantly
+     from load (pacing rebuilt after v1 feedback: no dead shifts)
+2. [x] **Environment incident + fix (2026-11-04)**: pip-installing Streamlit into the
      shared conda env upgraded numpy to 2.4.6 and broke every NumPy-1.x-compiled
-     library (pandas/pyarrow/scipy/sklearn ABI failure). Fix: Streamlit isolated in
-     dedicated venv `/opt/venv/fraudui` (Dockerfile layer); notebooks rule stays
-     `/opt/conda`, dashboard rule `/opt/venv/fraudui` — one environment per artifact.
+     library in it (pandas/pyarrow/scipy/sklearn ABI failures, `numpy.dtype size
+     changed`). Fix: Streamlit isolated in a dedicated venv `/opt/venv/fraudui`
+     (Dockerfile layer); environment rule — notebooks `/opt/conda`, dashboard
+     `/opt/venv/fraudui`, one environment per artifact, never mixed
 3. [x] **Evidence**: `33` Cell-17 artifact checkpoint · `34` shift end (46,592 seen |
-     1,618 suspicious | 4 decisions | ~52% alarm accuracy) · `35` Statistics tab at the
-     locked operating point (0.495 F1 @ 0.5, matching Phase 4 to the digit)
-     - Record correction confirmed from two sources: test window holds **1,809 real
-       frauds** (849 caught + 960 missed), not 1,781 as quoted in early chat notes
-4. [ ] **Streaming (NEXT — architecture agreed 2026-11-06)**: Kafka broker (docker-compose
-     service, KRaft single node) + producer replaying IEEE-CIS test transactions at
-     N rows/s → `transactions` topic → Spark Structured Streaming job (`notebook 07`)
-     applies saved `models/gbt_winner` → `alerts` topic + parquet + checkpoints;
-     measured end-to-end latency + restart-resume demo. Fact that scopes it honestly:
-     no public live labeled card feed exists (PII/PCI); broker + benchmark corpus is
-     the standard fraud-stream evaluation setup — report/slide will state this.
-     Fallback if broker is painful: socket source (same model path, fewer semantics).
-     Adder: dashboard flips from CSV replay to live monitor of the alerts stream.
-5. [ ] Dockerize full pipeline into clean, re-runnable services (venv layer already in
-     place; remaining: one-command bring-up of all services)
+     1,618 suspicious | 4 case decisions | ~52% alarm accuracy) · `35` Statistics tab
+     at the locked operating point (0.495 F1 @ 0.5 — matches Phase 4 to the digit)
+   - Record correction (confirmed in CSV + dashboard): test window holds **1,809 real
+     frauds** (849 caught + 960 missed) — supersedes the 1,781 quoted in early notes
+4. [ ] Dockerize full pipeline into clean, re-runnable services (venv layer done;
+     remaining: one-command bring-up of broker + notebook + console)
 
-# 🧩 PHASE 6 — Deliverables & Presentation (aligned to course instructions 1–8)
+# 🧩 PHASE 6 — Real-Time Streaming (Kafka + Spark Structured Streaming, agreed 2026-11-06)
+
+> Scoped with the 2026-11-06 reality check: a public live fraud-labeled card feed does
+> not exist (PII/PCI) — broker + benchmark corpus is the standard evaluation setup for
+> fraud streaming; the report states this and cites the Kafka/Spark 2025 paper for the
+> transport tier.
+
+1. [ ] **Broker**: docker-compose service, KRaft single node; create topics
+      `transactions` / `alerts`
+2. [ ] **Producer**: `src/stream/producer.py` (container process) — IEEE-CIS test-window
+      transactions → JSON → `transactions` topic at configurable rows/s
+3. [ ] **Streaming job**: `notebooks/07_streaming_preview.ipynb` (kernel /opt/conda):
+      readStream kafka → from_json → PipelineModel.load(models/gbt_winner) →
+      filter fraud → `alerts` topic + parquet + checkpoints under `data/stream`
+4. [ ] **Measured scoreboard**: processed/s, alerts/s, alert fraud-rate (~52% expected),
+      end-to-end latency; kill-and-restart the job to demo checkpoint resume
+5. [ ] **Dashboard live-monitor adder**: Fraud Watch reads the alerts stream instead of
+      the CSV replay (~20 lines in `src/dashboard/app.py`)
+6. [ ] **Evidence**: `37_streaming_alerts.png` (stream scoreboard) ·
+      `38_dashboard_live_monitor.png` (live console) — `36` stays reserved/optional
+7. [ ] **Docs**: limitations section gains the ingest honesty note; report cites the
+      Kafka/Spark 2025 paper as the transfer-backed transport citation
+
+# 🧩 PHASE 7 — Deliverables & Presentation (aligned to course instructions 1–8)
 
 ### Presentation outline (12–15 slides)
 1. Title + team & member roles
@@ -159,20 +175,11 @@ Deliverables must follow the course instructions: presentation of 10–15 slides
 14. References slide
 15. Q&A prep
 
-### Group contribution plan — 2-member team (both must be able to defend the project)
-| | Member 1 (you) — technical lead | Member 2 |
-|---|---|---|
-| Pipeline work | Docker env, PySpark EDA/preprocessing, modeling, evaluation, dashboard | — |
-| Supporting work | — | Literature review: 2024–2026 papers (IJCAI, AAAI, CIKM, Kafka/Spark 2025) → related-work slide + `reports/references.bib` |
-| Report & slides | Implementation, architecture, results sections | Proposal, intro, conclusion; slide design & layout |
-| Presentation | Walks through implementation live (Docker → Spark → results) | Problem statement, why-big-data, related work, conclusions |
-
-⚠️ **Instruction #8 trap:** since Member 1 is doing the core build, Member 2 must actively engage with it too (e.g., run the check notebook once + do a teach-back session ~1 week before the presentation) so both can answer questions under viva.
 
 ### Conclusion section checklist
 - Key findings (RF & GBT-d5 tie on ranking prAUC ≈ 0.486 = ~12.5x lift; LR floors at 0.177; engineered velocity features rank in the winner's top-10)
 - Limitations (single-laptop scale, anonymous/V-features, no true cluster)
-- Future improvements (streaming at scale, graph-based detection per IJCAI/AAAI 2024, deep learning, model drift monitoring)
+- Future improvements (real-time streaming — now implemented in Phase 6, graph-based detection per IJCAI/AAAI 2024, deep learning, model drift monitoring)
 
 ### Evidence folder (`reports/screenshots/`)
 Spark UI, notebook outputs, Parquet listings in Docker, curves/matrices — everything shown on slides needs a screenshot + explanation.
@@ -182,12 +189,14 @@ Spark UI, notebook outputs, Parquet listings in Docker, curves/matrices — ever
 ## ⚠️ Risks
 - **Laptop RAM** → cap driver memory (3 GB), Parquet pushdown, sample for tuning
 - **400+ feature volume** → simple preprocessing first, iterate later
-- **Streaming scope creep** → batch-first; streaming only after core pipeline is solid
+- **Streaming scope creep** → batch-first at heart; Phase 6 streaming is bounded to the
+  checkpointed demo items (broker + producer + notebook + monitor adder) — the batch
+  GBT-d5 remains the scoring authority
 - **C: drive space (only ~41 GB)** → all large files on D:; Docker already relocated
-- **Member 2 engagement** → viva defense requires both members able to explain the work (instruction #8)
 
 ## Demo day checklist
 - [ ] Live dashboard or recorded demo ready
+- [ ] Streaming demo (kill-restart + latency numbers)
 - [ ] Docker services start with one command
-- [ ] Every member has rehearsed their section
+- [ ] Demo rehearsed start to finish
 - [ ] References slide cites ≥5 recent (2024–2026) sources
