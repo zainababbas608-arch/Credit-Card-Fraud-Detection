@@ -1,6 +1,7 @@
 """Fraud Watch - the fraud officer's shift screen.
 Replays the labeled 17-day future window using the Phase-4 GBT-d5 scores read
 offline from CSV; no Spark in the UI. The science lives in the Statistics tab."""
+import glob, os
 import time
 import numpy as np
 import pandas as pd
@@ -9,6 +10,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
+LIVE = "data/stream/alerts"                      # notebook-07 parquet sink (spark-written)
 CSV, THR, TICK = "data/processed/dashboard_test.csv", 0.5, 0.25
 TOP = [("V258", 5.5), ("C13", 4.6), ("C1", 4.4), ("TransactionAmt", 4.1), ("card1_amt_avg", 4.0),
        ("C14", 3.9), ("C11", 3.5), ("day", 3.0), ("card6_idx", 2.6), ("card3", 2.6)]
@@ -92,36 +94,65 @@ with st.sidebar:
     st.caption(f"Replay of the labeled future window (days 166-182), verdicts from the Phase-4 model read offline. "
                f"{N:,} transactions | {F:,} real fraud. No Spark in the UI.")
     mode = st.radio("View", ["Shift screen", "Statistics"], key="mode")
-    speed = st.slider("Replay speed (x)", 1, 10, 3, disabled=mode != "Shift screen")
+    feed = st.radio("Feed", ["Replay", "Live"], key="feed", disabled=mode != "Shift screen")
+    speed = st.slider("Replay speed (x)", 1, 10, 3, disabled=(mode != "Shift screen") or feed == "Live")
 
 if mode == "Shift screen":
-    w = df.iloc[: ss.cursor]                     # transactions seen so far
-    day = int(w.iloc[-1]["day"])
-
-    st.progress(ss.cursor / N, text=f"shift progress - day {day} of 183 (replaying future days 166-182)")
-    c1, c2, _ = st.columns([1, 1, 8])
-    if c1.button("Play/Pause"):
-        ss.playing = not ss.playing
-    if c2.button("Reset shift"):
-        ss.cursor, ss.playing = START, True
-    if ss.playing:
-        time.sleep(TICK)
-        ss.cursor = min(ss.cursor + 150 * speed, N)
-        if ss.cursor < N:
+    if feed == "Live":                           # the live shift starts on THIS page visit - empty
+        parts = [f for f in glob.glob(LIVE + "/*.parquet") if os.path.getsize(f) > 0]
+        if not parts:
+            st.info("No live alerts yet - launch the tier: run_dashboard.ps1 -Live (or notebook 07, cells 1-2).")
+            time.sleep(3)
             st.rerun()
-        ss.playing = False
-        st.toast("shift replay complete")
+        ss.setdefault("fseen", frozenset(parts))           # baseline: sink files present when the page opened
+        ss.setdefault("buf", pd.DataFrame(columns=["TransactionID", "TransactionAmt", "day", "isFraud", "p_gbt"]))
+        fresh = [f for f in parts if f not in ss.fseen]    # arrival-time truth: a re-run pass legitimately re-alerts
+        if fresh:
+            ctx = df.drop(columns=["isFraud", "p_gbt", "TransactionAmt", "day", "TransactionDT"]).set_index("TransactionID")
+            add = (pd.concat([pd.read_parquet(f) for f in fresh], ignore_index=True)
+                   .drop_duplicates("TransactionID").join(ctx, on="TransactionID")
+                   .rename(columns={"p_fraud": "p_gbt"}))
+            ss.buf = add if not len(ss.buf) else pd.concat([ss.buf, add], ignore_index=True)
+            ss.fseen = ss.fseen | frozenset(fresh)
+        w = ss.buf                                         # the accumulated live shift
+        if not len(w):
+            st.caption("LIVE - page open, waiting for the stream to start scoring "
+                       "(launch with .\\run_dashboard.ps1 -Live). Polling every 3 s.")
+        else:
+            day = int(w.iloc[-1]["day"])
+            st.caption(f"LIVE - {len(w):,} new alerts since this page opened (day {day}); auto-refresh every 3 s.")
+
+    else:                                        # the replay engine, unchanged
+        w = df.iloc[: ss.cursor]                     # transactions seen so far
+        day = int(w.iloc[-1]["day"])
+        st.progress(ss.cursor / N, text=f"shift progress - day {day} of 183 (replaying future days 166-182)")
+        c1, c2, _ = st.columns([1, 1, 8])
+        if c1.button("Play/Pause"):
+            ss.playing = not ss.playing
+        if c2.button("Reset shift"):
+            ss.cursor, ss.playing = START, True
+        if ss.playing:
+            time.sleep(TICK)
+            ss.cursor = min(ss.cursor + 150 * speed, N)
+            if ss.cursor < N:
+                st.rerun()
+            ss.playing = False
+            st.toast("shift replay complete")
 
     alerts = w[w["p_gbt"] >= THR]
-    pending = alerts[~alerts["TransactionID"].isin(list(ss.verdicts))]   # oldest first: card stays readable while play runs
+    pending = alerts[~alerts["TransactionID"].isin(list(ss.verdicts))]   # undecided cases...
+    if feed == "Live":
+        pending = pending.sort_values("p_gbt", ascending=False)          # ...worst first - triage like a real desk
+    else:
+        pending = pending.sort_index()                                   # ...oldest first - readable while replay runs
 
     if len(w):
         if len(alerts):
             alarm_line = f"so far, about {cm(w, THR)[4]:.0%} of alarms turned out to be real fraud"
         else:
             alarm_line = "a quiet start - no alarms yet"
-        st.markdown(f"**Shift day {day} | {len(w):,} transactions seen | {len(alerts):,} suspicious | "
-                    f"{len(ss.verdicts):,} case decisions | {alarm_line}**")
+        st.markdown(f"**Shift day {day} | {len(w):,} {'streaming alerts' if feed == 'Live' else 'transactions seen'} | "
+                    f"{len(alerts):,} suspicious | {len(ss.verdicts):,} case decisions | {alarm_line}**")
 
     case_col, feed_col = st.columns([3, 2])
     with case_col:
@@ -156,15 +187,26 @@ if mode == "Shift screen":
 
     st.subheader("Cases opened this shift")
     if ss.verdicts:
-        lw = w[w["TransactionID"].isin(ss.verdicts)].copy()
-        lw["your call"] = lw["TransactionID"].map(ss.verdicts)
-        lw["what it really was"] = np.where(lw["isFraud"] == 1, "real fraud", "clean")
-        hits = ((lw["your call"] == "confirmed") == (lw["isFraud"] == 1)).sum()
-        st.caption(f"{hits:,}/{len(lw):,} of your decisions matched what actually happened")
-        st.dataframe(lw[["TransactionID", "your call", "what it really was", "TransactionAmt"]]
-                     .rename(columns={"TransactionID": "case", "TransactionAmt": "amount"}), hide_index=True)
+        order = list(ss.verdicts)[::-1]                      # decisions in reverse - most recent call on top
+        lw = (w[w["TransactionID"].isin(order)]
+              .set_index("TransactionID"))
+        lw = lw.loc[[i for i in order if i in lw.index]].reset_index()   # a decision may predate this window
+        if len(lw):
+            call = lw["TransactionID"].map(ss.verdicts)
+            hits = (call == "confirmed").eq(lw["isFraud"] == 1).sum()
+            lw["your call"] = call.map({"confirmed": "Confirm fraud", "dismissed": "False alarm"})
+            lw["what it really was"] = np.where(lw["isFraud"] == 1, "fraud", "clean")
+            st.caption(f"{hits:,}/{len(lw):,} of your decisions matched what actually happened")
+            st.dataframe(lw[["TransactionID", "your call", "what it really was", "TransactionAmt"]]
+                         .rename(columns={"TransactionID": "case", "TransactionAmt": "amount"}), hide_index=True)
+        else:
+            st.caption("Decisions exist, but none in this feed's window yet - switch feed or let replay reach them.")
     else:
         st.caption("No cases opened yet.")
+
+    if feed == "Live":                           # saving throw: re-read the sink every 3 s
+        time.sleep(3)
+        st.rerun()
 
 else:
     st.subheader("Statistics - the science behind the shift")
