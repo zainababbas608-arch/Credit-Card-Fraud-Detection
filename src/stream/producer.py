@@ -22,5 +22,8 @@ for i, r in enumerate(rows):
     if dt > 0:
         time.sleep(dt)
     p.send(TOPIC, r)
+    if i % 250 == 0:                              # the dashboard's Live header reads this progress file
+        open("/home/jovyan/work/data/stream/sent.txt", "w").write(str(i + 1))
+open("/home/jovyan/work/data/stream/sent.txt", "w").write(str(len(rows)))
 p.flush()
 print(f"done: {sent if (sent := i + 1) else 0:,} rows in {time.time() - t0:.1f}s")

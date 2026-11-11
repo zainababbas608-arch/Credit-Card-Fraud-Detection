@@ -1,5 +1,6 @@
 services:
   dev:
+    container_name: fraud-datascience        
     build:
       context: ./.devcontainer
     ports:

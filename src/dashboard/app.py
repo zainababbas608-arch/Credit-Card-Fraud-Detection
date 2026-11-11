@@ -36,6 +36,15 @@ def size_note(a):
     return "tiny for this card" if a < 0.5 else (f"{a:.1f}x the card's usual spend" if a > 3 else "usual size for this card")
 
 
+RC = {"red": "#e5484d", "orange": "#f5a524", "green": "#22a06b"}     # risk word -> hex for the html pieces
+
+
+def meter(p, cl):                                # the case card's suspicion bar, colored by risk
+    st.markdown(f'<div style="height:10px;background:#eceaf6;border-radius:999px;overflow:hidden">'
+                f'<div style="height:10px;width:{p:.0%};background:{RC[cl]};border-radius:999px"></div></div>',
+                unsafe_allow_html=True)
+
+
 def band(d, t):
     tp, fp, fn, _, pr, rc, f1 = cm(d, t)
     money = d.loc[(d["isFraud"] == 1) & (d["p_gbt"] >= t), "TransactionAmt"].sum()
@@ -49,22 +58,29 @@ def band(d, t):
 
 
 st.set_page_config(page_title="Fraud Watch", layout="wide")
-st.markdown("""<style>                 /* ops-room dark theme: the console the officer works at */
-.stApp {background:#14161a; color:#d7dbe0}
+st.markdown("""<style>            /* watch-desk light theme: soft cards, purple accent, Inter */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
+.stApp {background:#f6f5fb; color:#1d1d27; font-family:"Inter","Segoe UI",system-ui,sans-serif}
 [data-testid="stHeader"] {background:transparent}
-section[data-testid="stSidebar"] {background:#0c0e11; border-right:1px solid #23262b}
-section[data-testid="stSidebar"] h1 {border-bottom:2px solid #e63946; padding-bottom:6px}
-h2, h3 {color:#f2f3f5; letter-spacing:.02em}
-div[data-testid="stMarkdownContainer"] p, .stCaption {color:#d7dbe0}
-[data-testid="stMetric"] {background:#1b1e24; border:1px solid #2a2e35; border-radius:8px; padding:12px}
-[data-testid="stMetricLabel"] p {color:#8b9097; text-transform:uppercase; letter-spacing:.08em; font-size:.72rem}
-[data-testid="stMetricValue"] {font-family:"JetBrains Mono","Consolas",monospace; color:#f2f3f5}
-div[data-testid="stMarkdownContainer"] code {color:#7fd1b9; font-family:"Consolas",monospace}
-.stButton>button {background:#1b1e24; color:#e8eaed; border:1px solid #3a3f47; border-radius:6px}
-.stButton>button:hover {border-color:#e63946; color:#fff}
-div[data-testid="stProgress"] div[role="progressbar"] > div {background:#e63946}
-div[data-testid="stCaptionContainer"] p {color:#8b9097; font-family:"Consolas",monospace; font-size:.85rem}
-[data-testid="stDataFrame"] {background:#1b1e24; border:1px solid #2a2e35; border-radius:8px}
+section[data-testid="stSidebar"] {background:#fff; border-right:1px solid #e8e6f3; font-family:"Inter","Segoe UI",sans-serif}
+section[data-testid="stSidebar"] h1 {font-size:1.35rem; font-weight:800; border-bottom:3px solid #5b4cff; padding-bottom:8px}
+h2 {font-size:1.05rem; font-weight:800; border-left:4px solid #5b4cff; padding-left:8px; letter-spacing:-.01em}
+h3 {font-weight:800}
+[data-testid="stMarkdownContainer"] p {color:#1d1d27}
+[data-testid="stMetric"] {background:#fff; border:1px solid #e8e6f3; border-radius:12px; padding:12px;
+                          box-shadow:0 1px 2px rgba(29,29,39,.04)}
+[data-testid="stMetricLabel"] p {color:#6f6f7c; text-transform:uppercase; letter-spacing:.06em; font-size:.7rem}
+[data-testid="stMetricValue"] {font-weight:800}
+[data-testid="stMarkdownContainer"] code {background:#f0eefc; color:#5b4cff; border-radius:6px;
+                                          padding:1px 5px; font-weight:600}
+.stButton>button {background:#fff; color:#1d1d27; border:1px solid #d9d5ee; border-radius:999px; font-weight:600}
+.stButton>button:hover {border-color:#5b4cff; color:#5b4cff}
+[class*="st-key-cf"] button {background:#22a06b; border-color:#22a06b; color:#fff}
+[class*="st-key-fa"] button {background:#e5484d; border-color:#e5484d; color:#fff}
+div[data-testid="stProgress"] > div {background:#eceaf6; border-radius:999px}
+div[data-testid="stProgress"] div[role="progressbar"] > div {background:#5b4cff}
+div[data-testid="stCaptionContainer"] p {color:#6f6f7c; font-size:.85rem}
+[data-testid="stDataFrame"] {border:1px solid #e8e6f3; border-radius:12px}
 </style>""", unsafe_allow_html=True)
 try:
     @st.cache_data
@@ -137,13 +153,14 @@ if mode == "Shift screen":
                        "(launch with .\\run_dashboard.ps1 -Live). Polling every 3 s.")
         else:
             day = int(w.iloc[-1]["day"])
-            st.caption(f"LIVE - {len(w):,} new alerts since this page opened (day {day}); auto-refresh every 3 s.")
+            st.caption(f"LIVE - alert queue: {len(w):,} new alerts since this page opened (day {day}); "
+                       f"the full population lives in Replay. Auto-refresh every 3 s.")
 
     else:                                        # the replay engine, unchanged
         w = df.iloc[: ss.cursor]                     # transactions seen so far
         day = int(w.iloc[-1]["day"])
         st.progress(ss.cursor / N, text=f"shift progress - day {day} of 183 (replaying future days 166-182)")
-        c1, c2, _ = st.columns([1, 1, 8])
+        c1, c2, _ = st.columns([3, 3, 6])
         if c1.button("Play/Pause"):
             ss.playing = not ss.playing
         if c2.button("Reset shift"):
@@ -168,8 +185,16 @@ if mode == "Shift screen":
             alarm_line = f"so far, about {cm(w, THR)[4]:.0%} of alarms turned out to be real fraud"
         else:
             alarm_line = "a quiet start - no alarms yet"
-        st.markdown(f"**Shift day {day} | {len(w):,} {'streaming alerts' if feed == 'Live' else 'transactions seen'} | "
-                    f"{len(alerts):,} suspicious | {len(ss.verdicts):,} case decisions | {alarm_line}**")
+        if feed == "Live":
+            try:
+                sent = int(open("data/stream/sent.txt").read())     # producer's pass progress
+            except (OSError, ValueError):
+                sent = 0
+            head = (f"{len(w):,} alerts in the queue (of {sent:,} transactions scored)" if sent
+                    else f"{len(w):,} alerts in the queue (pass starting)")
+        else:
+            head = f"{len(w):,} of {N:,} transactions seen (full population) | {len(alerts):,} suspicious"
+        st.markdown(f"**Shift day {day} | {head} | {len(ss.verdicts):,} case decisions | {alarm_line}**")
 
     case_col, feed_col = st.columns([3, 2])
     with case_col:
@@ -177,18 +202,23 @@ if mode == "Shift screen":
         if len(pending):
             r = pending.iloc[0]
             cl, lab = risk(r["p_gbt"])
-            st.markdown(f"### Case #{int(r['TransactionID'])} - charge ${r['TransactionAmt']:,.2f} "
-                        f"on {card_tag(r['card1'])}")
+            st.markdown(f'<div style="display:flex;align-items:center;gap:12px;margin:2px 0 10px">'
+                        f'<div style="min-width:46px;height:46px;border-radius:50%;background:#f0eefc;color:#5b4cff;'
+                        f'display:flex;align-items:center;justify-content:center;font-weight:800">'
+                        f'{int(r["card1"]) % 1000:03d}</div>'
+                        f'<div><div style="font-weight:800;font-size:1.05rem">Case #{int(r["TransactionID"])}</div>'
+                        f'<div style="color:#6f6f7c">${r["TransactionAmt"]:,.2f} on card ...{int(r["card1"]) % 1000:03d}'
+                        f'</div></div></div>', unsafe_allow_html=True)
             st.markdown(f":{cl}[**Suspicion {r['p_gbt']:.0%} - {lab}**]")
-            st.progress(float(r["p_gbt"]))
+            meter(float(r["p_gbt"]), cl)
             for x in reasons(r):
                 st.markdown("- " + x)
             b1, b2, _ = st.columns([2, 2, 6])
-            if b1.button("Confirm fraud", key=f"cf{int(r['TransactionID'])}", use_container_width=True):
+            if b1.button("Confirm fraud", key="cf", use_container_width=True):     # stable key: no widget-identity churn between cases
                 ss.verdicts[int(r["TransactionID"])] = "confirmed"
                 st.toast(f"Case #{int(r['TransactionID'])} closed - booked as fraud")
                 st.rerun()
-            if b2.button("False alarm", key=f"fa{int(r['TransactionID'])}", use_container_width=True):
+            if b2.button("False alarm", key="fa", use_container_width=True):
                 ss.verdicts[int(r["TransactionID"])] = "dismissed"
                 st.toast(f"Case #{int(r['TransactionID'])} closed - released as clean")
                 st.rerun()
@@ -197,10 +227,13 @@ if mode == "Shift screen":
 
     with feed_col:
         st.subheader("Notifications")
-        for _, rn in w.tail(10).iloc[::-1].iterrows():
-            cl = risk(rn["p_gbt"])[0]
-            st.markdown(f":{cl}[●] ${rn['TransactionAmt']:,.2f} on {card_tag(rn['card1'])} - "
-                        f"suspicion {rn['p_gbt']:.0%} ({size_note(rn['amt_vs_card'])})")
+        rows = "".join(f'<div style="background:#fff;border:1px solid #e8e6f3;border-radius:10px;padding:8px 10px;'
+                       f'margin-bottom:6px;font-size:.85rem"><span style="color:{RC[risk(rn["p_gbt"])[0]]};'
+                       f'font-weight:800">&#9679;</span> <b>${rn["TransactionAmt"]:,.2f}</b> on card '
+                       f'...{int(rn["card1"]) % 1000:03d} <span style="color:#6f6f7c">- suspicion '
+                       f'{rn["p_gbt"]:.0%} ({size_note(rn["amt_vs_card"])})</span></div>'
+                       for _, rn in w.tail(10).iloc[::-1].iterrows())
+        st.markdown(rows or '<i style="color:#6f6f7c">waiting for the first alert...</i>', unsafe_allow_html=True)
 
     st.subheader("Cases opened this shift")
     if ss.verdicts:
