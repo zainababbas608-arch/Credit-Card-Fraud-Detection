@@ -49,6 +49,23 @@ def band(d, t):
 
 
 st.set_page_config(page_title="Fraud Watch", layout="wide")
+st.markdown("""<style>                 /* ops-room dark theme: the console the officer works at */
+.stApp {background:#14161a; color:#d7dbe0}
+[data-testid="stHeader"] {background:transparent}
+section[data-testid="stSidebar"] {background:#0c0e11; border-right:1px solid #23262b}
+section[data-testid="stSidebar"] h1 {border-bottom:2px solid #e63946; padding-bottom:6px}
+h2, h3 {color:#f2f3f5; letter-spacing:.02em}
+div[data-testid="stMarkdownContainer"] p, .stCaption {color:#d7dbe0}
+[data-testid="stMetric"] {background:#1b1e24; border:1px solid #2a2e35; border-radius:8px; padding:12px}
+[data-testid="stMetricLabel"] p {color:#8b9097; text-transform:uppercase; letter-spacing:.08em; font-size:.72rem}
+[data-testid="stMetricValue"] {font-family:"JetBrains Mono","Consolas",monospace; color:#f2f3f5}
+div[data-testid="stMarkdownContainer"] code {color:#7fd1b9; font-family:"Consolas",monospace}
+.stButton>button {background:#1b1e24; color:#e8eaed; border:1px solid #3a3f47; border-radius:6px}
+.stButton>button:hover {border-color:#e63946; color:#fff}
+div[data-testid="stProgress"] div[role="progressbar"] > div {background:#e63946}
+div[data-testid="stCaptionContainer"] p {color:#8b9097; font-family:"Consolas",monospace; font-size:.85rem}
+[data-testid="stDataFrame"] {background:#1b1e24; border:1px solid #2a2e35; border-radius:8px}
+</style>""", unsafe_allow_html=True)
 try:
     @st.cache_data
     def load():
