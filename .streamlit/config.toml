@@ -1,0 +1,3 @@
+[theme]
+base = "light"          # pin the app light: the dataframe canvas follows OS dark mode otherwise
+primaryColor = "#5b4cff"  # watch-desk purple accent - drives progress bar, radios, slider, buttons
