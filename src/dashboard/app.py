@@ -110,7 +110,7 @@ if mode == "Shift screen":
     alerts = w[w["p_gbt"]>=THR]
     pending = alerts[~alerts["TransactionID"].isin(list(ss.verdicts))].sort_index()
     if len(w):
-        alarm_line = f"so far, about {cm(w,T)[4]:.0%} of alarms turned out to be real fraud" if len(alerts) else "a quiet start - no alarms yet"
+        alarm_line = f"so far, about {cm(w,THR)[4]:.0%} of alarms turned out to be real fraud" if len(alerts) else "a quiet start - no alarms yet"
         if feed == "Live":
             try: sent = int(open("data/stream/sent.txt").read())
             except (OSError,ValueError): sent = 0
